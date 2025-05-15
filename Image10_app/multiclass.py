@@ -72,7 +72,7 @@ def server(input, output, session):
                     return ui.panel_well(
                         ui.h4("Model Training"),
                         ui.p("We trained our model using augmented and oversampled data for better generalization."),
-                        ui.HTML("<h5>Confusion Matrix (Tumour Multiclass)</h5>"),
+                        ui.HTML("<h5>Confusion Matrix Non-Clahe (Multiclass)</h5>"),
                         ui.HTML(cm_img)
                     )
                 case "unseen":
