@@ -1,4 +1,14 @@
 from shiny import App, ui, render
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+from sklearn.metrics import confusion_matrix
+
+y_true = np.load("models/outputs/multiclass_NON-CLAHE_ytrue.npy")
+y_pred = np.load("models/outputs/multiclass_NON-CLAHE_ypred.npy")
 
 def app_ui(request):
     return ui.page_fluid(
@@ -26,6 +36,23 @@ def model_layout():
         ui.output_ui("model_content")
     )
 
+def cm_image(y_true, y_pred, labels):
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(labels)))
+    df_cm = pd.DataFrame(cm, index=labels, columns=labels)
+    
+    fig, ax = plt.subplots(figsize=(6, 5))
+    sns.heatmap(df_cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+    ax.set_xlabel('Predicted Labels')
+    ax.set_ylabel('True Labels')
+    plt.tight_layout()
+    
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    plt.close(fig)
+    return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
+
 def server(input, output, session):
         @output
         @render.ui
@@ -40,9 +67,13 @@ def server(input, output, session):
                         ui.p("These are outlined in corresponding sections below.")
                     )
                 case "training":
+                    labels = ["Immune", "Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
+                    cm_img = cm_image(y_true, y_pred, labels)
                     return ui.panel_well(
                         ui.h4("Model Training"),
-                        ui.p("We trained our model using augmented and oversampled data for better generalization.")
+                        ui.p("We trained our model using augmented and oversampled data for better generalization."),
+                        ui.HTML("<h5>Confusion Matrix (Tumour Multiclass)</h5>"),
+                        ui.HTML(cm_img)
                     )
                 case "unseen":
                     return ui.panel_well(
