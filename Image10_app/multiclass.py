@@ -7,8 +7,9 @@ from io import BytesIO
 import base64
 from sklearn.metrics import confusion_matrix
 
-y_true = np.load("models/outputs/multiclass_NON-CLAHE_ytrue.npy")
-y_pred = np.load("models/outputs/multiclass_NON-CLAHE_ypred.npy")
+y_true = np.load("models/outputs/multiclass_NONCLAHE_ytrue.npy")
+y_pred = np.load("models/outputs/multiclass_NONCLAHE_ypred.npy")
+y_pred = np.argmax(y_pred, axis=1)
 
 def app_ui(request):
     return ui.page_fluid(
