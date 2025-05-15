@@ -7,9 +7,13 @@ from io import BytesIO
 import base64
 from sklearn.metrics import confusion_matrix
 
-y_true = np.load("models/outputs/multiclass_NONCLAHE_ytrue.npy")
-y_pred = np.load("models/outputs/multiclass_NONCLAHE_ypred.npy")
+y_true = np.load("models/outputs/multiclass_NONCLAHE_Training_ytrue.npy")
+y_pred = np.load("models/outputs/multiclass_NONCLAHE_Training_ypred.npy")
 y_pred = np.argmax(y_pred, axis=1)
+
+y_true_final = np.load("models/outputs/multiclass_NONCLAHE_ytrue.npy")
+y_pred_final = np.load("models/outputs/multiclass_NONCLAHE_ypred.npy")
+y_pred_final = np.argmax(y_pred_final, axis=1)
 
 def app_ui(request):
     return ui.page_fluid(
@@ -77,9 +81,13 @@ def server(input, output, session):
                         ui.HTML(cm_img)
                     )
                 case "unseen":
+                    labels = ["Immune", "Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
+                    cm_img = cm_image(y_true_final, y_pred_final, labels)
                     return ui.panel_well(
-                        ui.h4("Unseen Data"),
-                        ui.p("This section tests the model's performance on unseen data.")
+                        ui.h4("Model Training"),
+                        ui.p("We trained our model using augmented and oversampled data for better generalization."),
+                        ui.HTML("<h5>Confusion Matrix Non-Clahe (Multiclass)</h5>"),
+                        ui.HTML(cm_img)
                     )
 
 app = App(app_ui, server)
