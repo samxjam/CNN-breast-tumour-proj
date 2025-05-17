@@ -48,7 +48,7 @@ def server(input, output, session):
                     return ui.panel_well(
                         ui.h4("Unseen Data"),
                         ui.p("This section tests the model's performance on unseen data.")
-                        ui.p("When asking the model to distinguish between these immune cells and the main tumour cells, the model turned out to be highly reliable. However, it does not cover all the immune cell types, so it may not be as accurate when dealing with cells not used for its training.")
+                        ui.p("When asking the model to distinguish between these immune cells and the main tumour cells, the model is highly reliable. However, it does not cover all the immune cell types, so it may not be as accurate when dealing with cells not used for its training.")
                     )
 
 app = App(app_ui, server)
