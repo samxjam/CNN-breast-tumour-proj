@@ -9,6 +9,7 @@ from sklearn.metrics import confusion_matrix
 
 y_true = np.load("models/outputs/dlcnn_MS_CLAHE_ytrue.npy")
 y_pred = np.load("models/outputs/dlcnn_MS_CLAHE_ypred.npy")
+history_df = pd.read_csv("models/history/dlcnn_MS_CLAHE_history.csv")
 
 def app_ui(request):
     return ui.page_fluid(
@@ -61,6 +62,26 @@ def cm_image(y_true, y_pred, labels):
     ax.set_ylabel('True Labels')
     plt.tight_layout()
     
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    plt.close(fig)
+    return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
+
+def history_plot(history_df, metric="loss"):
+    fig, ax = plt.subplots()
+    ax.plot(history_df["binary_output_" + metric], label=f"Train Binary {metric.capitalize()}")
+    ax.plot(history_df["val_binary_output_" + metric], label=f"Val Binary {metric.capitalize()}")
+    ax.plot(history_df["multiclass_output_" + metric], label=f"Train Multiclass {metric.capitalize()}")
+    ax.plot(history_df["val_multiclass_output_" + metric], label=f"Val Multiclass {metric.capitalize()}")
+    ax.set_title(f"{metric.capitalize()} over Epochs")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel(metric.capitalize())
+    ax.legend()
+    plt.tight_layout()
+    plt.grid(alpha=0.5)
+
     buffer = BytesIO()
     plt.savefig(buffer, format="png")
     buffer.seek(0)
@@ -158,11 +179,26 @@ def server(input, output, session):
             case "training":
                 labels = ["Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
                 cm_img = cm_image(y_true, y_pred, labels)
+                loss_plot = history_plot(history_df, "loss")
+                accuracy_plot = history_plot(history_df, "accuracy")
+                
                 return ui.panel_well(
                     ui.h4("Model Training"),
                     ui.p("We trained our model using augmented and oversampled data for better generalization."),
-                    ui.HTML("<h5>Confusion Matrix (Tumour Multiclass)</h5>"),
-                    ui.HTML(cm_img)
+                    ui.layout_columns(
+                        ui.card(
+                            ui.h5("Confusion Matrix (Tumour Multiclass)"),
+                            ui.HTML(cm_img)
+                        ),
+                        ui.card(
+                            ui.h5("Training Performance"),
+                            ui.navset_tab(
+                                ui.nav_panel("Loss", ui.HTML(loss_plot)),
+                                ui.nav_panel("Accuracy", ui.HTML(accuracy_plot)),
+                                id="metric_tabs"
+                            )
+                        )
+                    )
                 )
             case "unseen":
                 return ui.panel_well(
