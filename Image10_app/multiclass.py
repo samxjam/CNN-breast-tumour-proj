@@ -15,6 +15,8 @@ y_true_final = np.load("models/outputs/multiclass_NONCLAHE_ytrue.npy")
 y_pred_final = np.load("models/outputs/multiclass_NONCLAHE_ypred.npy")
 y_pred_final = np.argmax(y_pred_final, axis=1)
 
+history_df = pd.read_csv("models/history/multiclass_NONCLAHE_history.csv")
+
 def app_ui(request):
     return ui.page_fluid(
         ui.tags.head(
@@ -58,6 +60,24 @@ def cm_image(y_true, y_pred, labels):
     plt.close(fig)
     return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
 
+def history_plot(history_df, metric="loss"):
+    fig, ax = plt.subplots()
+    ax.plot(history_df["multiclass_output_" + metric], label=f"Train Multiclass {metric.capitalize()}")
+    ax.plot(history_df["val_multiclass_output_" + metric], label=f"Val Multiclass {metric.capitalize()}")
+    ax.set_title(f"{metric.capitalize()} over Epochs")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel(metric.capitalize())
+    ax.legend()
+    plt.tight_layout()
+    plt.grid(alpha=0.5)
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    plt.close(fig)
+    return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
+
 def server(input, output, session):
         @output
         @render.ui
@@ -74,11 +94,26 @@ def server(input, output, session):
                 case "training":
                     labels = ["Immune", "Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
                     cm_img = cm_image(y_true, y_pred, labels)
+                    loss_plot = history_plot(history_df, "loss")
+                    accuracy_plot = history_plot(history_df, "accuracy")
+
                     return ui.panel_well(
                         ui.h4("Model Training"),
                         ui.p("We trained our model using augmented and oversampled data for better generalization."),
-                        ui.HTML("<h5>Confusion Matrix Non-Clahe (Multiclass)</h5>"),
-                        ui.HTML(cm_img)
+                        ui.layout_columns(
+                            ui.card(
+                                ui.h5("Confusion Matrix Non-Clahe (Multiclass)"),
+                                ui.HTML(cm_img)
+                            ),
+                            ui.card(
+                                ui.h5("Training Performance"),
+                                ui.navset_tab(
+                                    ui.nav_panel("Loss", ui.HTML(loss_plot)),
+                                    ui.nav_panel("Accuracy", ui.HTML(accuracy_plot)),
+                                    id="metric_tabs"
+                                )
+                            )
+                        )
                     )
                 case "unseen":
                     labels = ["Immune", "Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
