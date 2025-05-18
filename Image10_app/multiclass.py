@@ -11,8 +11,8 @@ y_true = np.load("models/outputs/multiclass_NONCLAHE_Training_ytrue.npy")
 y_pred = np.load("models/outputs/multiclass_NONCLAHE_Training_ypred.npy")
 y_pred = np.argmax(y_pred, axis=1)
 
-y_true_final = np.load("models/outputs/multiclass_NONCLAHE_ytrue.npy")
-y_pred_final = np.load("models/outputs/multiclass_NONCLAHE_ypred.npy")
+y_true_final = np.load("models/outputs/multiclass_NONCLAHE_ytrue1.npy")
+y_pred_final = np.load("models/outputs/multiclass_NONCLAHE_ypred1.npy")
 y_pred_final = np.argmax(y_pred_final, axis=1)
 
 history_df = pd.read_csv("models/history/multiclass_NONCLAHE_history.csv")
