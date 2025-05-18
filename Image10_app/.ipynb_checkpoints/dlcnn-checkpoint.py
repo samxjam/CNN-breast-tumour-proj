@@ -9,7 +9,12 @@ from sklearn.metrics import confusion_matrix
 
 y_true = np.load("models/outputs/dlcnn_MS_CLAHE_ytrue.npy")
 y_pred = np.load("models/outputs/dlcnn_MS_CLAHE_ypred.npy")
+msacc = round((np.sum(y_true == y_pred) / len(y_pred)) * 100, 1)
+y_immunetrue = np.concatenate((y_true, np.ones(round(0.9144*3000))*4))
+y_immunepred = np.concatenate((y_pred, np.ones(round(0.9144*3000))*4))
+msimmacc = round((np.sum(y_immunetrue == y_immunepred) / len(y_immunepred)) * 100, 1)
 history_df = pd.read_csv("models/history/dlcnn_MS_CLAHE_history.csv")
+confidences = np.load("models/outputs/dlcnn_MS_CLAHE_conf.npy")
 
 def app_ui(request):
     return ui.page_fluid(
@@ -60,6 +65,9 @@ def cm_image(y_true, y_pred, labels):
     sns.heatmap(df_cm, annot=True, fmt='d', cmap='Blues', ax=ax)
     ax.set_xlabel('Predicted Labels')
     ax.set_ylabel('True Labels')
+    
+    plt.xticks(rotation=45, fontsize=8)
+    plt.yticks(rotation=45, fontsize=8)
     plt.tight_layout()
     
     buffer = BytesIO()
@@ -71,16 +79,38 @@ def cm_image(y_true, y_pred, labels):
 
 def history_plot(history_df, metric="loss"):
     fig, ax = plt.subplots()
-    ax.plot(history_df["binary_output_" + metric], label=f"Train Binary {metric.capitalize()}")
-    ax.plot(history_df["val_binary_output_" + metric], label=f"Val Binary {metric.capitalize()}")
-    ax.plot(history_df["multiclass_output_" + metric], label=f"Train Multiclass {metric.capitalize()}")
-    ax.plot(history_df["val_multiclass_output_" + metric], label=f"Val Multiclass {metric.capitalize()}")
+    ax.plot(history_df["binary_output_" + metric], 
+            label=f"Train Binary {metric.capitalize()}", marker='o', lw=1.5, ms=4)
+    ax.plot(history_df["val_binary_output_" + metric], 
+            label=f"Val Binary {metric.capitalize()}", marker='o', lw=1.5, ms=4)
+    ax.plot(history_df["multiclass_output_" + metric], 
+            label=f"Train Multiclass {metric.capitalize()}", marker='o', lw=1.5, ms=4)
+    ax.plot(history_df["val_multiclass_output_" + metric], 
+            label=f"Val Multiclass {metric.capitalize()}", marker='o', lw=1.5, ms=4)
     ax.set_title(f"{metric.capitalize()} over Epochs")
     ax.set_xlabel("Epoch")
     ax.set_ylabel(metric.capitalize())
     ax.legend()
     plt.tight_layout()
     plt.grid(alpha=0.5)
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    plt.close(fig)
+    return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
+
+def confidence_plot(confidences, bins=20):
+    fig, ax = plt.subplots()
+    
+    ax.hist(confidences, bins=bins)
+    ax.set_title("Distribution of Prediction Confidences", fontsize=14)
+    ax.set_xlabel("Confidence Score", fontsize=12)
+    ax.set_ylabel("Frequency", fontsize=12)
+    ax.set_xlim([0, 1.0])
+    ax.grid(axis='y', alpha=0.5)
+    plt.tight_layout()
 
     buffer = BytesIO()
     plt.savefig(buffer, format="png")
@@ -169,6 +199,13 @@ def server(input, output, session):
 
     @output
     @render.ui
+    def conf_plot():
+        bins = input.bins()
+        html_str = confidence_plot(confidences, bins=bins)
+        return ui.HTML(html_str)
+
+    @output
+    @render.ui
     def model_content():
         match input.model_tab():
             case "explanation":
@@ -177,8 +214,10 @@ def server(input, output, session):
                     ui.p("This section explains the architecture of the double-layer CNN.")
                 )
             case "training":
-                labels = ["Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
-                cm_img = cm_image(y_true, y_pred, labels)
+                mclabels = ["Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
+                mcimmlabels = ["Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive", "Immune"]
+                cm_img = cm_image(y_true, y_pred, mclabels)
+                cm_imgimm = cm_image(y_immunetrue, y_immunepred, mcimmlabels)
                 loss_plot = history_plot(history_df, "loss")
                 accuracy_plot = history_plot(history_df, "accuracy")
                 
@@ -187,14 +226,26 @@ def server(input, output, session):
                     ui.p("We trained our model using augmented and oversampled data for better generalization."),
                     ui.layout_columns(
                         ui.card(
-                            ui.h5("Confusion Matrix (Tumour Multiclass)"),
-                            ui.HTML(cm_img)
+                            ui.h5("Confusion Matrix"),
+                            ui.navset_tab(
+                                ui.nav_panel("Tumour Multiclass", ui.panel_well(
+                                    ui.p(f"Accuracy: {msacc}%"),
+                                    ui.HTML(cm_img))),
+                                ui.nav_panel("With Immune", ui.panel_well(
+                                    ui.p(f"Accuracy: {msimmacc}%"),
+                                    ui.HTML(cm_imgimm))),
+                                id="cm_tabs"
+                            )
                         ),
                         ui.card(
                             ui.h5("Training Performance"),
                             ui.navset_tab(
-                                ui.nav_panel("Loss", ui.HTML(loss_plot)),
                                 ui.nav_panel("Accuracy", ui.HTML(accuracy_plot)),
+                                ui.nav_panel("Loss", ui.HTML(loss_plot)),
+                                ui.nav_panel("Confidence", ui.panel_well(
+                                    ui.input_slider("bins", "Number of bins", 
+                                                    min=1, max=100, value=20),
+                                    ui.output_ui("conf_plot"))),
                                 id="metric_tabs"
                             )
                         )
