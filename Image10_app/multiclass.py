@@ -17,6 +17,17 @@ y_pred_final = np.argmax(y_pred_final, axis=1)
 
 history_df = pd.read_csv("models/history/multiclass_NONCLAHE_history.csv")
 
+y_CLAHE_true = np.load("models/outputs/multiclass_CLAHE_Training_ytrue.npy")
+y_CLAHE_pred = np.load("models/outputs/multiclass_CLAHE_Training_ypred.npy")
+y_CLAHE_pred = np.argmax(y_CLAHE_pred, axis=1)
+
+y_CLAHE_true_final = np.load("models/outputs/multiclass_CLAHE_ytrue.npy")
+y_CLAHE_pred_final = np.load("models/outputs/multiclass_CLAHE_ypred.npy")
+y_CLAHE_pred_final = np.argmax(y_CLAHE_pred_final, axis=1)
+
+history_CLAHE_df = pd.read_csv("models/history/multiclass_CLAHE_history.csv")
+
+
 def app_ui(request):
     return ui.page_fluid(
         ui.tags.head(
@@ -97,6 +108,53 @@ def server(input, output, session):
                     loss_plot = history_plot(history_df, "loss")
                     accuracy_plot = history_plot(history_df, "accuracy")
 
+                    cm_CLAHE_img = cm_image(y_CLAHE_true, y_CLAHE_pred, labels)
+                    loss_CLAHE_plot = history_plot(history_CLAHE_df, "loss")
+                    accuracy_CLAHE_plot = history_plot(history_CLAHE_df, "accuracy")
+
+                    return ui.panel_well(
+                        ui.h4("Model Training"),
+                        ui.p("We trained our model using augmented and oversampled data for better generalization."),
+                        ui.navset_tab(
+                            ui.nav_panel("Non-Clahe", 
+                                            ui.layout_columns(
+                                                ui.card(
+                                                    ui.h5("Confusion Matrix Non-Clahe (Multiclass)"),
+                                                    ui.HTML(cm_img)
+                                                ),
+                                                ui.card(
+                                                    ui.h5("Training Performance"),
+                                                    ui.navset_tab(
+                                                        ui.nav_panel("Loss", ui.HTML(loss_plot)),
+                                                        ui.nav_panel("Accuracy", ui.HTML(accuracy_plot)),
+                                                        id="metric_tabs"
+                                                    )
+                                                )
+                                            )
+                                         ),
+                            ui.nav_panel("Clahe", 
+                                            ui.layout_columns(
+                                                ui.card(
+                                                    ui.h5("Confusion Matrix Clahe (Multiclass)"),
+                                                    ui.HTML(cm_CLAHE_img)
+                                                ),
+                                                ui.card(
+                                                    ui.h5("Training Performance"),
+                                                    ui.navset_tab(
+                                                        ui.nav_panel("Loss", ui.HTML(loss_CLAHE_plot)),
+                                                        ui.nav_panel("Accuracy", ui.HTML(accuracy_CLAHE_plot)),
+                                                        id="metric_tabs"
+                                                    )
+                                                )
+                                            )
+                                         )
+                        )
+
+                    )
+                case "unseen":
+                    labels = ["Immune", "Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
+                    cm_img = cm_image(y_true_final, y_pred_final, labels)
+                    cm_CLAHE_img = cm_image(y_CLAHE_true_final, y_CLAHE_pred_final, labels)
                     return ui.panel_well(
                         ui.h4("Model Training"),
                         ui.p("We trained our model using augmented and oversampled data for better generalization."),
@@ -106,23 +164,10 @@ def server(input, output, session):
                                 ui.HTML(cm_img)
                             ),
                             ui.card(
-                                ui.h5("Training Performance"),
-                                ui.navset_tab(
-                                    ui.nav_panel("Loss", ui.HTML(loss_plot)),
-                                    ui.nav_panel("Accuracy", ui.HTML(accuracy_plot)),
-                                    id="metric_tabs"
-                                )
+                                ui.h5("Confusion Matrix Clahe (Multiclass)"),
+                                ui.HTML(cm_CLAHE_img)
                             )
                         )
-                    )
-                case "unseen":
-                    labels = ["Immune", "Invasive", "DCIS 1", "DCIS 2", "Prolif Invasive"]
-                    cm_img = cm_image(y_true_final, y_pred_final, labels)
-                    return ui.panel_well(
-                        ui.h4("Model Training"),
-                        ui.p("We trained our model using augmented and oversampled data for better generalization."),
-                        ui.HTML("<h5>Confusion Matrix Non-Clahe (Multiclass)</h5>"),
-                        ui.HTML(cm_img)
                     )
 
 app = App(app_ui, server)
