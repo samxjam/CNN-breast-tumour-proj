@@ -128,9 +128,6 @@ def dl_predict_class(file_path, model_key):
         
     return predicted_label, confidence
 
-def gradcam_image(file_path):
-    return encode_image(file_path)
-
 def app_ui(request):
     return ui.page_fluid(
         ui.tags.head(
@@ -159,27 +156,6 @@ def app_ui(request):
         )
     )
 
-def dual_confidence_plot(conf1, conf2, label1="Model A", label2="Model B", bins=20):
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
-
-    axes[0].hist(conf1, bins=bins, color='skyblue', edgecolor='black')
-    axes[0].set_title(label1)
-    axes[0].set_xlabel("Confidence")
-    axes[0].set_ylabel("Frequency")
-
-    axes[1].hist(conf2, bins=bins, color='lightgreen', edgecolor='black')
-    axes[1].set_title(label2)
-    axes[1].set_xlabel("Confidence")
-
-    plt.tight_layout()
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
-    buffer.seek(0)
-    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    plt.close(fig)
-
-    return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
-
 def test_image_layout():
     return ui.layout_sidebar(
         ui.sidebar("Upload an H&E image for model prediction and visualization."),
@@ -187,8 +163,6 @@ def test_image_layout():
         ui.layout_columns(
 
             ui.card(
-                ui.h4("Choose Classification Model"),
-                ui.hr(),
                 ui.h4("Upload & Session Management"),
                 ui.input_file("image_upload", "Upload H&E Image", accept=[".jpg", ".png", ".tif"]),
                 ui.input_file("log_upload", "Resume from previous session (.csv)", accept=[".csv"]),
@@ -215,9 +189,8 @@ def test_image_layout():
                     selected="Agree"
                 ),
                 ui.input_text_area("user_comment", "Add Comment"),
-                ui.input_action_button("submit_comment", "Submit Comment:"),
                 ui.output_ui("correct_class_ui"),
-                ui.input_text("region_of_interest", "Region of Interest (e.g., top-right, center)"),
+                ui.input_action_button("submit_comment", "Submit Comment:"),
                 ui.hr(),
                 ui.h4("Prediction Log"),
                 ui.output_ui("prediction_table"),
@@ -276,24 +249,26 @@ def server(input, output, session):
         results = []
         for model_key in ["Double Layer", "Multiclass"]:
             if model_key == "Double Layer":
-                pred, conf = dl_predict_class(file_path, model_key)
-                results.append((model_key, pred, conf))
+                dl_pred, dl_conf = dl_predict_class(file_path, model_key)
+                results.append((model_key, dl_pred, dl_conf))
             if model_key == "Multiclass":
-                pred, conf = mc_predict_class(file_path, model_key)
-                results.append((model_key, pred, conf))
+                mc_pred, mc_conf = mc_predict_class(file_path, model_key)
+                results.append((model_key, mc_pred, mc_conf))
 
         # Log result only once with default model
         default_model_key, default_pred, default_conf = results[0]
         last_prediction.clear()
         last_prediction.update({
-            "filename": file_path.split("/")[-1],
-            "model": "BOTH",
-            "prediction": default_pred,
-            "confidence": default_conf,
             "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "comment": ""
+            "filename": uploaded[0]["name"],
+            "dl_prediction": dl_pred,
+            "dl_confidence": dl_conf,
+            "mc_prediction": mc_pred,
+            "mc_confidence": mc_conf,
+            "comment": "",
+            "agreement": "",
+            "suggested": ""
         })
-        prediction_log.append(last_prediction.copy())
 
         # Display results side-by-side
         return ui.div(
@@ -311,56 +286,60 @@ def server(input, output, session):
             ui.tags.span("Prediction complete", class_="badge bg-success")
         )
 
-
     @reactive.effect
+    @reactive.event(input.submit_comment)
     def on_submit_comment():
         if input.submit_comment():
             comment = input.user_comment()
             agreement = input.prediction_agreement()
-            roi = input.region_of_interest().strip()
             suggested = input.correct_class() if agreement == "Disagree" else ""
-
-            if last_prediction:
-                last_prediction["comment"] = comment
-                last_prediction["agree"] = agreement
-                last_prediction["roi"] = roi
-                last_prediction["suggested"] = suggested
-
-                prediction_log.append(last_prediction.copy())
-
+    
+            if last_prediction and isinstance(last_prediction, dict):
+                entry = last_prediction.copy()
+                entry.update({
+                    "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "comment": comment,
+                    "agreement": agreement,
+                    "suggested": suggested,
+                })
+                prediction_log.append(entry)
+                
                 session.send_input_message("user_comment", {"value": ""})
                 session.send_input_message("region_of_interest", {"value": ""})
                 session.send_input_message("prediction_agreement", {"value": "Agree"})
-
+    
                 ui.notification_show("Comment saved with prediction", type="message", duration=3000)
+            else:
+                ui.notification_show("No prediction available to annotate", type="error", duration=3000)
+
 
     @output
     @render.ui
+    @reactive.event(input.submit_comment)
     def prediction_table():
         if not prediction_log:
             return ui.p("No prediction log available. Submit a comment to record this prediction.")
-        df = pd.DataFrame(prediction_log)
-        df.columns = ["Timestamp", "Filename", "Model", "Prediction", "Confidence", "Agree", "Comment"]
-        html_table = df.to_html(classes="table table-striped", index=False, border=0)
-        return ui.HTML(f"<div class='table-responsive'>{html_table}</div>")
+        else:
+            df = pd.DataFrame(prediction_log)
+            df.columns = ["timestamp", "filename", "dl_prediction", "dl_confidence", "mc_prediction", "mc_confidence","comment", "agreement", "suggested"]
+            html_table = df.to_html(classes="table table-striped", index=False, border=0)
+            return ui.HTML(f"<div class='table-responsive'>{html_table}</div>")
 
-
-    @output
-    @render.ui
-    def gradcam_plot():
-        uploaded = input.image_upload()
-        if not uploaded:
-            return ""
-        file_path = uploaded[0]["datapath"]
-        gradcam = gradcam_image(file_path)
-        return ui.HTML(f"<img src='data:image/png;base64,{gradcam}' class='img-fluid'/>")
-    
     @output
     @render.download(filename="prediction_log.csv")
     def download_log():
-        df = pd.DataFrame(prediction_log)
-        return df.to_csv(index=False)
-
+        def writer(out_file):
+            df = pd.DataFrame(prediction_log)
+            if df.empty:
+                out_file.write("No prediction data available.")
+                return
+            df = df[
+                ["timestamp", "filename", "dl_prediction", "dl_confidence",
+                 "mc_prediction", "mc_confidence", "comment", "agreement", "suggested"]
+            ]
+            df.to_csv(out_file, index=False)
+        return writer
+    
     @output
     @render.ui
     def correct_class_ui():
@@ -369,6 +348,7 @@ def server(input, output, session):
                 "correct_class",
                 "Suggested Correct Class",
                 choices=[
+                    "Immune",
                     "Invasive",
                     "DCIS 1",
                     "DCIS 2",
