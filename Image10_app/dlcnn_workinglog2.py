@@ -136,25 +136,48 @@ def app_ui(request):
                 href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.1/dist/cerulean/bootstrap.min.css",
                 id="theme-css"
             ),
-            ui.tags.style(""" 
+            ui.tags.style("""
+                input[type="file"]::file-selector-button {
+                    background-color: #0d6efd !important;
+                    color: white !important;
+                    border: none !important;
+                    padding: 6px 12px !important;
+                    border-radius: 4px !important;
+                    cursor: pointer !important;
+                }
+
+                input[type="file"] {
+                    background-color: #444 !important;
+                    color: #fff !important;
+                    border: 1px solid #888 !important;
+                    border-radius: 4px !important;
+                    padding: 4px;
+                }
+
                 html, body {
                     margin: 0 !important;
                     padding: 0 !important;
                     overflow-x: hidden;
                     font-family: 'Segoe UI', sans-serif;
                 }
+
                 .navbar {
                     margin-bottom: 0 !important;
                     min-height: 60px;
                 }
-                body > .container-fluid {
-                    padding-left: 15px !important;
-                    padding-right: 15px !important;
-                }
+
                 .navbar-nav .nav-link, .navbar-brand {
                     color: #ffffff !important;
                 }
+
+                #theme-buffer {
+                    visibility: hidden;
+                    height: 0;
+                    margin: 0;
+                    padding: 0;
+                }
             """),
+
             ui.tags.script("""
                 Shiny.addCustomMessageHandler("set-theme", function(data) {
                     var css = document.getElementById("theme-css");
@@ -166,7 +189,7 @@ def app_ui(request):
         ),
 
         ui.page_navbar(
-            ui.nav_panel("Test Image", test_image_layout()),
+            ui.nav_panel("", test_image_layout()),
             title=ui.output_ui("app_title"),
         ),
     )
@@ -175,14 +198,14 @@ def test_image_layout():
     return ui.layout_sidebar(
                 ui.sidebar(
                     "Upload an H&E image for model prediction and visualization.",
-                ui.div(
-                    ui.input_switch("dark_mode", "Enhance Cell Visibility", value=False),
-                    ui.tags.div(
-                        "Use this mode to better distinguish H&E cell structures in low-light environments.",
-                        class_="form-text text-muted"
-                    ),
-                    class_="mb-3"
-                ),
+                    ui.card(
+                        ui.input_switch("dark_mode", "Enhance Cell Visibility", value=False),
+                        ui.tags.div(
+                            "Use this mode to better distinguish H&E cell structures in low-light environments.",
+                            class_="form-text text-muted"
+                        ),
+                        style="padding: 10px;"
+                    )
                 ),
                 
         ui.layout_columns(
@@ -376,6 +399,22 @@ def server(input, output, session):
         )
         await session.send_custom_message("set-theme", {"theme": theme_url})
 
+
+
+        script = """
+            const nav = document.querySelector('.navbar');
+            if (nav) {
+                nav.classList.toggle('navbar-dark', arguments[0]);
+                nav.classList.toggle('navbar-light', !arguments[0]);
+                nav.style.backgroundColor = arguments[0] ? '#222' : '#f8f9fa';
+            }
+
+            const title = document.querySelector('.navbar-brand');
+            if (title) {
+                title.style.color = arguments[0] ? '#fff' : '#000';
+            }
+        """
+        await session.send_custom_message("set-theme", {"theme": theme_url})
 
 
 
