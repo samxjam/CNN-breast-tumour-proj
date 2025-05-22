@@ -143,45 +143,33 @@ def dl_predict_class(file_path, model_key):
 def app_ui(request):
     return ui.page_fluid(
         ui.tags.head(
+            ui.tags.title("Interactive H&E Classifier"),
             ui.tags.link(
                 rel="stylesheet",
                 href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.1/dist/darkly/bootstrap.min.css",
                 id="theme-css"
             ),
+            ui.tags.link(rel="icon", type="image/png", href="/favicon.png"),
             ui.tags.style("""
                 input[type="file"]::file-selector-button {
-                    background-color: #0d6efd !important;
+                    background-color: #1f8ef1 !important;
                     color: white !important;
-                    border: none !important;
-                    padding: 6px 12px !important;
-                    border-radius: 4px !important;
+                    font-weight: bold;
+                    border: 2px solid #ffffff !important;
+                    padding: 8px 16px !important;
+                    border-radius: 6px !important;
                     cursor: pointer !important;
+                    transition: background-color 0.3s ease;
+                }
+                input[type="file"]::file-selector-button:hover {
+                    background-color: #3399ff !important;
                 }
                 input[type="file"] {
-                    background-color: #444 !important;
+                    background-color: #222 !important;
                     color: #fff !important;
-                    border: 1px solid #888 !important;
+                    border: 1px solid #666 !important;
                     border-radius: 4px !important;
-                    padding: 4px;
-                }
-                html, body {
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    overflow-x: hidden;
-                    font-family: 'Segoe UI', sans-serif;
-                }
-                .navbar {
-                    margin-bottom: 0 !important;
-                    min-height: 60px;
-                }
-                .navbar-nav .nav-link, .navbar-brand {
-                    color: #ffffff !important;
-                }
-                #theme-buffer {
-                    visibility: hidden;
-                    height: 0;
-                    margin: 0;
-                    padding: 0;
+                    padding: 6px;
                 }
             """),
         ),
