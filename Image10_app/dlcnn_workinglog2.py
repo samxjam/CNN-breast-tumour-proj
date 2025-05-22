@@ -9,6 +9,10 @@ from sklearn.metrics import confusion_matrix
 from shiny import reactive
 import tensorflow as tf
 import os
+import base64
+
+with open("www/logo.png", "rb") as f:
+    encoded_logo = base64.b64encode(f.read()).decode()
 
 
 def masked_sparse_categorical_crossentropy(y_true, y_pred):
@@ -46,10 +50,10 @@ class_labels = {
 }
 
 demo_image_map = {
-    "Clear DCIS 2": "demo/CLEAR_DCIS_2_cell_167707_100.png",
+    "Clear DCIS 2": "demo/CLEAR_DCIS_1_cell_167707_100.png",
     "Blurry Invasive": "demo/BLURRY_Invasive_cell_6094_100.png",
     "White Out Stromal": "demo/WHITEOUT_Stromal_cell_26_10.png",
-    "Immune": "demo/IMMUNE_cell_2662_100.png",
+    "Immune": "demo/IMMUNE_2772_100.png",
     "Tumor": "demo/TUMOR_cell_10043_100.png",
 }
 
@@ -141,7 +145,7 @@ def app_ui(request):
         ui.tags.head(
             ui.tags.link(
                 rel="stylesheet",
-                href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.1/dist/cerulean/bootstrap.min.css",
+                href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.1/dist/darkly/bootstrap.min.css",
                 id="theme-css"
             ),
             ui.tags.style("""
@@ -180,15 +184,6 @@ def app_ui(request):
                     padding: 0;
                 }
             """),
-
-            ui.tags.script("""
-                Shiny.addCustomMessageHandler("set-theme", function(data) {
-                    var css = document.getElementById("theme-css");
-                    if (css) {
-                        css.href = data.theme;
-                    }
-                });
-            """)
         ),
 
         ui.page_navbar(
@@ -201,14 +196,6 @@ def test_image_layout():
     return ui.layout_sidebar(
                 ui.sidebar(
                     "Upload an H&E image for model prediction and visualization.",
-                    ui.card(
-                        ui.input_switch("dark_mode", "Enhance Cell Visibility", value=False),
-                        ui.tags.div(
-                            "Use this mode to better distinguish H&E cell structures in low-light environments.",
-                            class_="form-text text-muted"
-                        ),
-                        style="padding: 10px;"
-                    )
                 ),     
         ui.layout_columns(
             ui.card(
@@ -303,12 +290,16 @@ def server(input, output, session):
             """)
         except Exception as e:
             return ui.p(f"Failed to load image: {e}")
-        
+
     @output
     @render.ui
     def app_title():
-        color = "#FFFFFF" if input.dark_mode() else "#000000"
-        return ui.tags.h3("Interactive H&E Classifier", style=f"color: {color}; margin: 0;")
+        return ui.tags.div(
+            ui.tags.img(
+                src=f"data:image/png;base64,{encoded_logo}",
+                height="90px",
+                style="margin-left: 10px;"
+     ))
 
     @output
     @render.ui
@@ -415,17 +406,6 @@ def server(input, output, session):
             ]
             df.to_csv(out_file, index=False)
 
-    
-    @reactive.Effect
-    @reactive.event(input.dark_mode)
-    async def toggle_theme():
-        theme_url = (
-            "https://cdn.jsdelivr.net/npm/bootswatch@5.3.1/dist/darkly/bootstrap.min.css"
-            if input.dark_mode()
-            else "https://cdn.jsdelivr.net/npm/bootswatch@5.3.1/dist/cerulean/bootstrap.min.css"
-        )
-        await session.send_custom_message("set-theme", {"theme": theme_url})
-
 
 
         script = """
@@ -440,7 +420,6 @@ def server(input, output, session):
                 title.style.color = arguments[0] ? '#fff' : '#000';
             }
         """
-        await session.send_custom_message("set-theme", {"theme": theme_url})
 
     @reactive.Effect
     @reactive.event(input.image_upload)
