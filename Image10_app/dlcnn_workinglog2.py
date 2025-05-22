@@ -324,10 +324,13 @@ def server(input, output, session):
         try:
             encoded = encode_image(file_path)
             return ui.HTML(f"""
-                <div style='border: 1px solid #ccc; overflow: hidden; max-width: 100%;'>
+                <div style='border: 1px solid #ccc; overflow: hidden; max-width: 100%; margin-bottom: 10px;'>
                     <img id='panzoom-img' src='data:image/png;base64,{encoded}'
                         style='width: 100%; cursor: grab;' draggable="false"/>
                 </div>
+                <span class='badge bg-success' style='color: #000; font-weight: bold; background-color: #28a745; padding: 8px 16px; font-size: 1rem; display: inline-block;'>
+                    Prediction complete
+                </span>
             """)
         except Exception as e:
             return ui.p(f"Failed to load image: {e}")
@@ -391,7 +394,6 @@ def server(input, output, session):
                 ]
             ),
             ui.hr(),
-            ui.tags.span("Prediction complete", class_="badge bg-success")
         )
 
     @reactive.Effect
