@@ -152,17 +152,17 @@ def app_ui(request):
             ui.tags.link(rel="icon", type="image/png", href="/favicon.png"),
             ui.tags.style("""
                 input[type="file"]::file-selector-button {
-                    background-color: #1f8ef1 !important;
+                    background-color: transparent !important;
                     color: white !important;
+                    border: 2px solid white !important;
+                    border-radius: 5px !important;
+                    padding: 6px 12px !important;
                     font-weight: bold;
-                    border: 2px solid #ffffff !important;
-                    padding: 8px 16px !important;
-                    border-radius: 6px !important;
-                    cursor: pointer !important;
-                    transition: background-color 0.3s ease;
+                    cursor: pointer;
                 }
                 input[type="file"]::file-selector-button:hover {
-                    background-color: #3399ff !important;
+                    background-color: white !important;
+                    color: black !important;
                 }
                 input[type="file"] {
                     background-color: #222 !important;
@@ -182,23 +182,75 @@ def app_ui(request):
 
 def test_image_layout():
     return ui.layout_sidebar(
-                ui.sidebar(
-                    "Upload an H&E image for model prediction and visualization.",
-                ),     
+        ui.sidebar(
+            "Upload an H&E image for model prediction and visualization.",
+        ),
         ui.layout_columns(
             ui.card(
                 ui.h4("Upload & Session Management"),
-                ui.div(
-                    ui.input_file("image_upload", "Upload H&E Image", accept=[".jpg", ".png", ".tif"]),
-                    ui.input_select(
-                        "demo_selector", 
-                        "Or Select a Demo Image", 
-                        choices=demo_image_map, 
-                        selected=None
+
+                ui.tags.div(
+                    ui.tags.label("Upload H&E Image", style="color: white; font-weight: bold; display: block;"),
+                    ui.tags.div(
+                        ui.tags.label(
+                            "Browse...",
+                            for_="image_upload",
+                            style="""
+                                background-color: transparent;
+                                color: white;
+                                border: 2px solid white;
+                                padding: 6px 12px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-weight: bold;
+                                margin-top: 5px;
+                                display: inline-block;
+                            """
+                        ),
+                        ui.tags.input(
+                            id="image_upload",
+                            type="file",
+                            accept=".jpg,.png,.tif",
+                            style="display: none;"
+                        )
                     ),
                     style="margin-bottom: 1rem;"
                 ),
-                ui.input_file("log_upload", "Resume from previous session (.csv)", accept=[".csv"]),
+
+                ui.input_select(
+                    "demo_selector",
+                    "Or Select a Demo Image",
+                    choices=demo_image_map,
+                    selected=None
+                ),
+
+                ui.tags.div(
+                    ui.tags.label("Resume from previous session (.csv)", style="color: white; font-weight: bold; display: block; margin-top: 1rem;"),
+                    ui.tags.div(
+                        ui.tags.label(
+                            "Browse...",
+                            for_="log_upload",
+                            style="""
+                                background-color: transparent;
+                                color: white;
+                                border: 2px solid white;
+                                padding: 6px 12px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-weight: bold;
+                                margin-top: 5px;
+                                display: inline-block;
+                            """
+                        ),
+                        ui.tags.input(
+                            id="log_upload",
+                            type="file",
+                            accept=".csv",
+                            style="display: none;"
+                        )
+                    )
+                ),
+
                 ui.download_button("download_log_backup", "Backup Session Log", class_="btn btn-primary"),
                 style="margin-bottom: 20px;"
             ),
@@ -216,7 +268,7 @@ def test_image_layout():
             ui.card(
                 ui.h4("User Feedback"),
                 ui.input_radio_buttons(
-                    "prediction_agreement", 
+                    "prediction_agreement",
                     "Do you agree with the model’s prediction?",
                     choices=["Agree", "Disagree", "Unsure"],
                     selected="Agree"
@@ -233,6 +285,7 @@ def test_image_layout():
             )
         )
     )
+
 from PIL import Image, ImageFilter
 
 def is_blurry(file_path, threshold=1000):
