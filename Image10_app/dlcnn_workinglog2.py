@@ -45,6 +45,14 @@ class_labels = {
     "binary": ["Immune", "Tumour"]
 }
 
+demo_image_map = {
+    "Clear DCIS 2": "demo/CLEAR_DCIS_2_cell_167707_100.png",
+    "Blurry Invasive": "demo/BLURRY_Invasive_cell_6094_100.png",
+    "White Out Stromal": "demo/WHITEOUT_Stromal_cell_26_10.png",
+    "Immune": "demo/IMMUNE_cell_2662_100.png",
+    "Tumor": "demo/TUMOR_cell_10043_100.png",
+}
+
 model_outputs = {
     "Double Layer": {
         "ytrue": "models/outputs/dlcnn_MS_CLAHE_ytrue.npy",
@@ -145,7 +153,6 @@ def app_ui(request):
                     border-radius: 4px !important;
                     cursor: pointer !important;
                 }
-
                 input[type="file"] {
                     background-color: #444 !important;
                     color: #fff !important;
@@ -153,23 +160,19 @@ def app_ui(request):
                     border-radius: 4px !important;
                     padding: 4px;
                 }
-
                 html, body {
                     margin: 0 !important;
                     padding: 0 !important;
                     overflow-x: hidden;
                     font-family: 'Segoe UI', sans-serif;
                 }
-
                 .navbar {
                     margin-bottom: 0 !important;
                     min-height: 60px;
                 }
-
                 .navbar-nav .nav-link, .navbar-brand {
                     color: #ffffff !important;
                 }
-
                 #theme-buffer {
                     visibility: hidden;
                     height: 0;
@@ -206,12 +209,20 @@ def test_image_layout():
                         ),
                         style="padding: 10px;"
                     )
-                ),
-                
+                ),     
         ui.layout_columns(
             ui.card(
                 ui.h4("Upload & Session Management"),
-                ui.input_file("image_upload", "Upload H&E Image", accept=[".jpg", ".png", ".tif"]),
+                ui.div(
+                    ui.input_file("image_upload", "Upload H&E Image", accept=[".jpg", ".png", ".tif"]),
+                    ui.input_select(
+                        "demo_selector", 
+                        "Or Select a Demo Image", 
+                        choices=demo_image_map, 
+                        selected=None
+                    ),
+                    style="margin-bottom: 1rem;"
+                ),
                 ui.input_file("log_upload", "Resume from previous session (.csv)", accept=[".csv"]),
                 ui.download_button("download_log_backup", "Backup Session Log", class_="btn btn-primary"),
                 style="margin-bottom: 20px;"
@@ -272,33 +283,48 @@ def server(input, output, session):
     @output
     @render.ui
     def image_preview():
+        demo_label = input.demo_selector()
         uploaded = input.image_upload()
-        if not uploaded:
+
+        if demo_label:
+            file_path = os.path.join(base_path, demo_image_map.get(demo_label))
+        elif uploaded:
+            file_path = uploaded[0]["datapath"]
+        else:
             return ui.p("No image uploaded")
-        file_path = uploaded[0]["datapath"]
-        img_tag = f"""
-        <div style='border: 1px solid #ccc; overflow: hidden; max-width: 100%;'>
-            <img id='panzoom-img' src='data:image/png;base64,{encode_image(file_path)}'
-                style='width: 100%; cursor: grab;' draggable="false"/>
-        </div>
-        """
-        return ui.HTML(img_tag)
+
+        try:
+            encoded = encode_image(file_path)
+            return ui.HTML(f"""
+                <div style='border: 1px solid #ccc; overflow: hidden; max-width: 100%;'>
+                    <img id='panzoom-img' src='data:image/png;base64,{encoded}'
+                        style='width: 100%; cursor: grab;' draggable="false"/>
+                </div>
+            """)
+        except Exception as e:
+            return ui.p(f"Failed to load image: {e}")
         
     @output
     @render.ui
     def app_title():
         color = "#FFFFFF" if input.dark_mode() else "#000000"
-        return ui.tags.h3("A Pathologist’s Best Friend", style=f"color: {color}; margin: 0;")
+        return ui.tags.h3("Interactive H&E Classifier", style=f"color: {color}; margin: 0;")
 
     @output
     @render.ui
     def prediction_result():
+        demo_label = input.demo_selector()
         uploaded = input.image_upload()
-        if not uploaded:
-            return ""
-        file_path = uploaded[0]["datapath"]
 
-        # Run both models
+        if demo_label:
+            file_path = os.path.join(base_path, demo_image_map.get(demo_label))
+            file_name = demo_label
+        elif uploaded:
+            file_path = uploaded[0]["datapath"]
+            file_name = uploaded[0]["name"]
+        else:
+            return ""
+
         results = []
         for model_key in ["Double Layer", "Multiclass"]:
             if model_key == "Double Layer":
@@ -308,22 +334,19 @@ def server(input, output, session):
                 mc_pred, mc_conf = mc_predict_class(file_path, model_key)
                 results.append((model_key, mc_pred, mc_conf))
 
-        # Log result only once with default model
-        default_model_key, default_pred, default_conf = results[0]
         last_prediction.clear()
         last_prediction.update({
             "timestamp": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "filename": uploaded[0]["name"],
-            "dl_prediction": dl_pred,
-            "dl_confidence": dl_conf,
-            "mc_prediction": mc_pred,
-            "mc_confidence": mc_conf,
+            "filename": file_name,
+            "dl_prediction": results[0][1],
+            "dl_confidence": results[0][2],
+            "mc_prediction": results[1][1],
+            "mc_confidence": results[1][2],
             "comment": "",
             "agreement": "",
             "suggested": ""
         })
 
-        # Display results side-by-side
         return ui.div(
             ui.layout_columns(
                 *[
@@ -338,6 +361,10 @@ def server(input, output, session):
             ui.hr(),
             ui.tags.span("Prediction complete", class_="badge bg-success")
         )
+
+    @reactive.Effect
+    def clear_initial_demo():
+        session.send_input_message("demo_selector", {"value": None})
 
     @reactive.effect
     @reactive.event(input.submit_comment)
@@ -408,7 +435,6 @@ def server(input, output, session):
                 nav.classList.toggle('navbar-light', !arguments[0]);
                 nav.style.backgroundColor = arguments[0] ? '#222' : '#f8f9fa';
             }
-
             const title = document.querySelector('.navbar-brand');
             if (title) {
                 title.style.color = arguments[0] ? '#fff' : '#000';
@@ -416,7 +442,11 @@ def server(input, output, session):
         """
         await session.send_custom_message("set-theme", {"theme": theme_url})
 
-
+    @reactive.Effect
+    @reactive.event(input.image_upload)
+    def reset_demo_on_upload():
+        session.send_input_message("demo_selector", {"value": None})
+        
 
     @output
     @render.download(
@@ -457,10 +487,16 @@ def server(input, output, session):
     @output
     @render.ui
     def blur_warning():
+        demo_label = input.demo_selector()
         uploaded = input.image_upload()
-        if not uploaded:
+
+        if demo_label:
+            file_path = os.path.join(base_path, demo_image_map.get(demo_label))
+        elif uploaded:
+            file_path = uploaded[0]["datapath"]
+        else:
             return ""
-        file_path = uploaded[0]["datapath"]
+
         if is_blurry(file_path):
             return ui.tags.span("Warning! Poor image quality detected: This image may be difficult to classify", class_="badge bg-danger")
         else:
