@@ -28,3 +28,6 @@ Note: "DL" refers to Double Layer, and "MC" refers to Multiclass
 + History plots for both accuracy and loss
 + Confusion matrix
 + Prediction confidence histogram
+
+### "DATA3888_Report.zip"
+- Contains all source code to produce the report pdf
