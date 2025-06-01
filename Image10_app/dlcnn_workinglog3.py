@@ -14,6 +14,26 @@ import base64
 with open("www/logo.png", "rb") as f:
     encoded_logo = base64.b64encode(f.read()).decode()
 
+def dual_confidence_plot(conf1, conf2, label1="Model A", label2="Model B", bins=20):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+
+    axes[0].hist(conf1, bins=bins, color='skyblue', edgecolor='black')
+    axes[0].set_title(label1)
+    axes[0].set_xlabel("Confidence")
+    axes[0].set_ylabel("Frequency")
+
+    axes[1].hist(conf2, bins=bins, color='lightgreen', edgecolor='black')
+    axes[1].set_title(label2)
+    axes[1].set_xlabel("Confidence")
+
+    plt.tight_layout()
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    plt.close(fig)
+
+    return f"<img src='data:image/png;base64,{img_base64}' class='img-fluid'/>"
 
 def masked_sparse_categorical_crossentropy(y_true, y_pred):
     y_true = tf.cast(y_true, tf.int32)
